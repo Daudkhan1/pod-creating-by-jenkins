@@ -1,59 +1,100 @@
-pipeline {
-    agent any
-
-    stages {
-        stage('Checkout') {
-            steps {
-                git 'https://github.com/Daudkhan1/pod-creating-by-jenkins.git'
-            }
-        }
-        stage('Build and Scan') {
-            steps {
-                container('jenkins-agent') {
-                    sh "docker --version" // Example Docker command
-                    sh "trivy --version"  // Example Trivy command
-                    // Add more commands as needed
-                }
-            }
-        }
-    }
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-// pipeline {
-//   agent {
-//     kubernetes {
-//       label 'jenkins-agent'  // all your pods will be named with this prefix, followed by a unique id
-//       idleMinutes 5  // how long the pod will live after no jobs have run on it
-//       yamlFile 'build-pod.yaml'  // path to the pod definition relative to the root of our project 
-//       defaultContainer 'maven'  // define a default container if more than a few stages use it, will default to jnlp container
-//     }
-//   }
-//   stages {
-//     stage('Build') {
-//       steps {  // no container directive is needed as the maven container is the default
-//         sh "mvn clean install"   
-//       }
-//     }
-//     stage('Build Docker Image') {
-//       steps {
-//         container('docker') {  
-//           sh "docker build -t vividseats/promo-app:dev ."  // when we run docker in this step, we're running it via a shell on the docker build-pod container, 
-//          // sh "docker push vividseats/promo-app:dev"        // which is just connecting to the host docker deaemon
-//         }
-//       }
-//     }
-//   }
-// }
+apiVersion: v1
+kind: Pod
+spec:
+  containers:
+    - name: jnlp
+      image: jenkins/inbound-agent:alpine-jdk17
+      command:
+        - "/bin/sh"
+        - "-c"
+      args:
+        - "while ! /usr/local/bin/jenkins-slave ; do sleep 5 ; done"
+      resources:
+        limits:
+          cpu: 500m
+          memory: 250Mi
+        requests:
+          cpu: 500m
+          memory: 250Mi
+    - name: goldenalgo
+      image: registry-acdc.tools.msi.audi.com/goldenalgo-build-agent:1.6.1
+      # hack to keep container running. see
+      # https://github.com/jenkinsci/kubernetes-plugin#constraints
+      command:
+        - cat
+      tty: true
+      resources:
+        limits:
+          cpu: 2
+          memory: 6Gi
+        requests:
+          cpu: 2
+          memory: 4Gi
+      volumeMounts:
+        - name: ivy2-credentials
+          mountPath: /root/.ivy2/.credentials
+          subPath: .credentials
+    - name: elasticsearch-server
+      image: registry-acdc.tools.msi.audi.com/elasticsearch:7.10.2
+      ports:
+        - containerPort: 9200
+      resources:
+        limits:
+          cpu: 2
+          memory: 3Gi
+        requests:
+          cpu: 1
+          memory: 1Gi
+      env:
+        - name: discovery.type
+          value: "single-node"
+    - name: kaniko
+      image: registry-acdc.tools.msi.audi.com/kaniko:debug-v1.3.0-1
+      command:
+        - cat
+      resources:
+        limits:
+          cpu: 1
+          memory: 2Gi
+        requests:
+          cpu: 1
+          memory: 1Gi
+      tty: true
+      volumeMounts:
+        - name: docker-config
+          mountPath: /kaniko/.docker/
+    - name: trivy
+      image: registry-acdc.tools.msi.audi.com/trivy:0.36.1
+      env:
+        - name: TRIVY_OFFLINE_SCAN
+          value: "true"
+      command:
+        - cat
+      resources:
+        limits:
+          cpu: 2
+          memory: 3Gi
+        requests:
+          cpu: 0.5
+          memory: 500Mi
+      tty: true
+      volumeMounts:
+        - name: docker-config
+          mountPath: /root/.docker/
+        - name: workspace
+          mountPath: /workspace
+  volumes:
+    - name: docker-config
+      configMap:
+        name: nexus-config
+    - name: kaniko-secret
+      secret:
+        secretName: acdc-registry
+    - name: ivy2-credentials
+      configMap:
+        name: ivy2-credentials
+    - name: workspace
+      emptyDir: {}
+  imagePullSecrets:
+    - name: acdc-registry
+  restartPolicy: Never
