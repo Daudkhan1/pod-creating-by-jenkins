@@ -1,4 +1,4 @@
-#!/usr/bin/env groovy
+// #!/usr/bin/env groovy
 // # @Library('acdc') _
 
 // String imageName = 'labeler-service'
@@ -13,10 +13,10 @@ pipeline {
     }
   }
 
-  options {
-    ansiColor('xterm')
-    disableConcurrentBuilds(abortPrevious: true)
-  }
+  // options {
+  //   ansiColor('xterm')
+  //   disableConcurrentBuilds(abortPrevious: true)
+  // }
 
   environment {
     FFPROBE_PATH = "/usr/bin/ffprobe"
