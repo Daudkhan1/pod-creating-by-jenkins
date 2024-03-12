@@ -13,10 +13,10 @@ pipeline {
     }
   }
 
-  // options {
-  //   ansiColor('xterm')
-  //   disableConcurrentBuilds(abortPrevious: true)
-  // }
+  options {
+    ansiColor('xterm')
+    disableConcurrentBuilds(abortPrevious: true)
+  }
 
   environment {
     FFPROBE_PATH = "/usr/bin/ffprobe"
