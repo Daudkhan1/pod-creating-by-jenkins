@@ -1,100 +1,104 @@
-apiVersion: v1
-kind: Pod
-spec:
-  containers:
-    - name: jnlp
-      image: jenkins/inbound-agent:alpine-jdk17
-      command:
-        - "/bin/sh"
-        - "-c"
-      args:
-        - "while ! /usr/local/bin/jenkins-slave ; do sleep 5 ; done"
-      resources:
-        limits:
-          cpu: 500m
-          memory: 250Mi
-        requests:
-          cpu: 500m
-          memory: 250Mi
-    - name: goldenalgo
-      image: registry-acdc.tools.msi.audi.com/goldenalgo-build-agent:1.6.1
-      # hack to keep container running. see
-      # https://github.com/jenkinsci/kubernetes-plugin#constraints
-      command:
-        - cat
-      tty: true
-      resources:
-        limits:
-          cpu: 2
-          memory: 6Gi
-        requests:
-          cpu: 2
-          memory: 4Gi
-      volumeMounts:
-        - name: ivy2-credentials
-          mountPath: /root/.ivy2/.credentials
-          subPath: .credentials
-    - name: elasticsearch-server
-      image: registry-acdc.tools.msi.audi.com/elasticsearch:7.10.2
-      ports:
-        - containerPort: 9200
-      resources:
-        limits:
-          cpu: 2
-          memory: 3Gi
-        requests:
-          cpu: 1
-          memory: 1Gi
-      env:
-        - name: discovery.type
-          value: "single-node"
-    - name: kaniko
-      image: registry-acdc.tools.msi.audi.com/kaniko:debug-v1.3.0-1
-      command:
-        - cat
-      resources:
-        limits:
-          cpu: 1
-          memory: 2Gi
-        requests:
-          cpu: 1
-          memory: 1Gi
-      tty: true
-      volumeMounts:
-        - name: docker-config
-          mountPath: /kaniko/.docker/
-    - name: trivy
-      image: registry-acdc.tools.msi.audi.com/trivy:0.36.1
-      env:
-        - name: TRIVY_OFFLINE_SCAN
-          value: "true"
-      command:
-        - cat
-      resources:
-        limits:
-          cpu: 2
-          memory: 3Gi
-        requests:
-          cpu: 0.5
-          memory: 500Mi
-      tty: true
-      volumeMounts:
-        - name: docker-config
-          mountPath: /root/.docker/
-        - name: workspace
-          mountPath: /workspace
-  volumes:
-    - name: docker-config
-      configMap:
-        name: nexus-config
-    - name: kaniko-secret
-      secret:
-        secretName: acdc-registry
-    - name: ivy2-credentials
-      configMap:
-        name: ivy2-credentials
-    - name: workspace
-      emptyDir: {}
-  imagePullSecrets:
-    - name: acdc-registry
-  restartPolicy: Never
+#!/usr/bin/env groovy
+@Library('acdc') _
+
+String imageName = 'labeler-service'
+String dockerStagePath = 'server/target/docker/stage'
+
+pipeline {
+
+  agent {
+    kubernetes {
+      defaultContainer 'goldenalgo'
+      yamlFile 'build.yaml'
+    }
+  }
+
+  options {
+    ansiColor('xterm')
+    disableConcurrentBuilds(abortPrevious: true)
+  }
+
+  environment {
+    FFPROBE_PATH = "/usr/bin/ffprobe"
+    FFMPEG_PATH = "/usr/bin/ffmpeg"
+  }
+
+  stages {
+
+    stage('Notify Stash build starting') {
+      steps {
+        echo "build is starting..."
+        script {
+          notifyBitbucket()
+        }
+      }
+    }
+
+    stage('Build & QA') {
+      steps {
+        sh 'npm install'
+        sh 'sbt qa doc'
+        step([$class: 'CoberturaPublisher', autoUpdateHealth: false,
+              autoUpdateStability: false, coberturaReportFile: '**/cobertura.xml',
+              failUnhealthy: false, failUnstable: false, maxNumberOfBuilds: 0,
+              onlyStable: false, sourceEncoding: 'ASCII', zoomCoverageChart: false])
+      }
+    }
+
+    stage('Build docker image') {
+      when {
+        branch "master"
+      }
+      steps {
+        sh 'sbt clean docker:stage'
+        container(name: 'kaniko') {
+          sh """
+          executor -c=$WORKSPACE/$dockerStagePath -f=$WORKSPACE/$dockerStagePath/Dockerfile --cleanup --no-push --destination image --tarPath image.tar
+          """
+        }
+      }
+    }
+
+    stage("Vulnerability scan") {
+      when {
+        branch "master"
+      }
+      steps {
+        sshagent(credentials: ['sofa-user-automation']) {
+          container('trivy') {
+            sh """
+            set -e
+            trivy --cache-dir .trivycache/ image --exit-code 0 --no-progress --input image.tar
+            trivy --cache-dir .trivycache/ image --exit-code 1 --ignore-unfixed --severity CRITICAL --no-progress --input image.tar
+            """
+          }
+        }
+      }
+    }
+
+    stage('Publish docker image') {
+      when {
+        branch "master"
+      }
+      steps {
+        sshagent(credentials: ['sofa-user-automation']) {
+          container('trivy') {
+            sh """
+            set -e
+            crane push image.tar registry-acdc.tools.msi.audi.com/$imageName:master
+            """
+          }
+        }
+      }
+    }
+  }
+
+  post {
+    always {
+      script {
+        currentBuild.result = currentBuild.result ?: 'SUCCESS'
+        notifyBitbucket()
+      }
+    }
+  }
+}
