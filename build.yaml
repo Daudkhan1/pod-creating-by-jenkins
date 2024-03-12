@@ -1,117 +1,100 @@
 apiVersion: v1
 kind: Pod
-metadata:
-  name: jenkins-agent
 spec:
   containers:
-    - name: docker
-      image: docker:latest
+    - name: jnlp
+      image: jenkins/inbound-agent:alpine-jdk17
       command:
         - "/bin/sh"
         - "-c"
-        - "while true; do sleep 30; done;"
+      args:
+        - "while ! /usr/local/bin/jenkins-slave ; do sleep 5 ; done"
+      resources:
+        limits:
+          cpu: 500m
+          memory: 250Mi
+        requests:
+          cpu: 500m
+          memory: 250Mi
+    - name: goldenalgo
+      image: registry-acdc.tools.msi.audi.com/goldenalgo-build-agent:1.6.1
+      # hack to keep container running. see
+      # https://github.com/jenkinsci/kubernetes-plugin#constraints
+      command:
+        - cat
+      tty: true
+      resources:
+        limits:
+          cpu: 2
+          memory: 6Gi
+        requests:
+          cpu: 2
+          memory: 4Gi
       volumeMounts:
-        - name: docker-socket
-          mountPath: /var/run/docker.sock
+        - name: ivy2-credentials
+          mountPath: /root/.ivy2/.credentials
+          subPath: .credentials
+    - name: elasticsearch-server
+      image: registry-acdc.tools.msi.audi.com/elasticsearch:7.10.2
+      ports:
+        - containerPort: 9200
+      resources:
+        limits:
+          cpu: 2
+          memory: 3Gi
+        requests:
+          cpu: 1
+          memory: 1Gi
+      env:
+        - name: discovery.type
+          value: "single-node"
+    - name: kaniko
+      image: registry-acdc.tools.msi.audi.com/kaniko:debug-v1.3.0-1
+      command:
+        - cat
+      resources:
+        limits:
+          cpu: 1
+          memory: 2Gi
+        requests:
+          cpu: 1
+          memory: 1Gi
+      tty: true
+      volumeMounts:
+        - name: docker-config
+          mountPath: /kaniko/.docker/
     - name: trivy
-      image: aquasec/trivy:latest
-      command: ["sleep", "infinity"]
+      image: registry-acdc.tools.msi.audi.com/trivy:0.36.1
+      env:
+        - name: TRIVY_OFFLINE_SCAN
+          value: "true"
+      command:
+        - cat
+      resources:
+        limits:
+          cpu: 2
+          memory: 3Gi
+        requests:
+          cpu: 0.5
+          memory: 500Mi
+      tty: true
       volumeMounts:
+        - name: docker-config
+          mountPath: /root/.docker/
         - name: workspace
           mountPath: /workspace
   volumes:
-    - name: docker-socket
-      hostPath:
-        path: /var/run/docker.sock
+    - name: docker-config
+      configMap:
+        name: nexus-config
+    - name: kaniko-secret
+      secret:
+        secretName: acdc-registry
+    - name: ivy2-credentials
+      configMap:
+        name: ivy2-credentials
     - name: workspace
       emptyDir: {}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# apiVersion: v1
-# kind: Pod
-# spec:
-#   containers:  # list of containers that you want present for your build, you can define a default container in the Jenkinsfile
-#     - name: maven
-#       image: maven:3.5.4-jdk-8-slim
-#       command: ["tail", "-f", "/dev/null"]  # this or any command that is bascially a noop is required, this is so that you don't overwrite the entrypoint of the base container
-#       imagePullPolicy: Always # use cache or pull image for agent
-#       resources:  # limits the resources your build contaienr
-#         requests:
-#           memory: "8Gi"
-#           cpu: "500m"
-#         limits:
-#           memory: "8Gi"
-#     - name: docker
-#       image: docker:18.06.1
-#       command: ["tail", "-f", "/dev/null"]
-#       imagePullPolicy: Always
-#       volumeMounts:
-#         - name: docker
-#           mountPath: /var/run/docker.sock # We use the k8s host docker engine
-#   volumes:
-#     - name: docker
-#       hostPath:
-#         path: /var/run/docker.sock
+  imagePullSecrets:
+    - name: acdc-registry
+  restartPolicy: Never
