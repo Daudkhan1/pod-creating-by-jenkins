@@ -2,6 +2,11 @@ pipeline {
     agent any
 
     stages {
+        stage('Checkout') {
+            steps {
+                git 'https://github.com/Daudkhan1/pod-creating-by-jenkins.git'
+            }
+        }
         stage('Build and Scan') {
             steps {
                 container('jenkins-agent') {
@@ -13,7 +18,6 @@ pipeline {
         }
     }
 }
-
 
 
 
