@@ -1,8 +1,8 @@
 #!/usr/bin/env groovy
-@Library('acdc') _
+// # @Library('acdc') _
 
-String imageName = 'labeler-service'
-String dockerStagePath = 'server/target/docker/stage'
+// String imageName = 'labeler-service'
+// String dockerStagePath = 'server/target/docker/stage'
 
 pipeline {
 
