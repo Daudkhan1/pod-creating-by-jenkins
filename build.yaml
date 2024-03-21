@@ -17,7 +17,7 @@ spec:
           cpu: 100m
           memory: 50Mi
     - name: nginx
-      image: nginx:lts
+      image: nginx
       # hack to keep container running. see
       # https://github.com/jenkinsci/kubernetes-plugin#constraints
       command:
@@ -97,4 +97,4 @@ spec:
   #     emptyDir: {}
   # imagePullSecrets:
   #   - name: acdc-registry
-  # restartPolicy: Never
+  restartPolicy: Never
