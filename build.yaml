@@ -11,11 +11,11 @@ spec:
         - "while ! /usr/local/bin/jenkins-slave ; do sleep 5 ; done"
       resources:
         limits:
-          cpu: 500m
-          memory: 250Mi
+          cpu: 100m
+          memory: 100Mi
         requests:
-          cpu: 500m
-          memory: 250Mi
+          cpu: 100m
+          memory: 50Mi
     - name: goldenalgo
       image: registry-acdc.tools.msi.audi.com/goldenalgo-build-agent:1.6.1
       # hack to keep container running. see
@@ -26,10 +26,10 @@ spec:
       resources:
         limits:
           cpu: 2
-          memory: 6Gi
+          memory: 1Gi
         requests:
           cpu: 2
-          memory: 4Gi
+          memory: 1Gi
       volumeMounts:
         - name: ivy2-credentials
           mountPath: /root/.ivy2/.credentials
@@ -41,10 +41,10 @@ spec:
       resources:
         limits:
           cpu: 2
-          memory: 3Gi
+          memory: 1Gi
         requests:
           cpu: 1
-          memory: 1Gi
+          memory: 500Mi
       env:
         - name: discovery.type
           value: "single-node"
@@ -55,10 +55,10 @@ spec:
       resources:
         limits:
           cpu: 1
-          memory: 2Gi
+          memory: 500Mi
         requests:
           cpu: 1
-          memory: 1Gi
+          memory: 500Mi
       tty: true
       volumeMounts:
         - name: docker-config
@@ -73,10 +73,10 @@ spec:
       resources:
         limits:
           cpu: 2
-          memory: 3Gi
+          memory: 1Gi
         requests:
           cpu: 0.5
-          memory: 500Mi
+          memory: 100Mi
       tty: true
       volumeMounts:
         - name: docker-config
