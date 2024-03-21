@@ -18,10 +18,10 @@ pipeline {
   //   disableConcurrentBuilds(abortPrevious: true)
   // }
 
-  environment {
-    FFPROBE_PATH = "/usr/bin/ffprobe"
-    FFMPEG_PATH = "/usr/bin/ffmpeg"
-  }
+  // environment {
+  //   FFPROBE_PATH = "/usr/bin/ffprobe"
+  //   FFMPEG_PATH = "/usr/bin/ffmpeg"
+  // }
 
   stages {
 
