@@ -16,8 +16,8 @@ spec:
         requests:
           cpu: 100m
           memory: 50Mi
-    - name: nginx
-      image: nginx
+    - name: node  
+      image: node
       # hack to keep container running. see
       # https://github.com/jenkinsci/kubernetes-plugin#constraints
       command:
@@ -35,7 +35,7 @@ spec:
       #     mountPath: /root/.ivy2/.credentials
       #     subPath: .credentials
     - name: elasticsearch
-      image: elasticsearch:lts
+      image: elastic/elasticsearch:7.11.0
       ports:
         - containerPort: 9200
       resources:
@@ -48,8 +48,8 @@ spec:
       env:
         - name: discovery.type
           value: "single-node"
-    - name: kaniko
-      image: bitnami/kaniko
+    - name: docker
+      image: docker:latest
       command:
         - cat
       resources:
