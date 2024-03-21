@@ -16,8 +16,8 @@ spec:
         requests:
           cpu: 100m
           memory: 50Mi
-    - name: goldenalgo
-      image: registry-acdc.tools.msi.audi.com/goldenalgo-build-agent:1.6.1
+    - name: nginx
+      image: nginx:lts
       # hack to keep container running. see
       # https://github.com/jenkinsci/kubernetes-plugin#constraints
       command:
@@ -30,12 +30,12 @@ spec:
         requests:
           cpu: 2
           memory: 1Gi
-      volumeMounts:
-        - name: ivy2-credentials
-          mountPath: /root/.ivy2/.credentials
-          subPath: .credentials
-    - name: elasticsearch-server
-      image: registry-acdc.tools.msi.audi.com/elasticsearch:7.10.2
+      # volumeMounts:
+      #   - name: ivy2-credentials
+      #     mountPath: /root/.ivy2/.credentials
+      #     subPath: .credentials
+    - name: elasticsearch
+      image: elasticsearch:lts
       ports:
         - containerPort: 9200
       resources:
@@ -49,7 +49,7 @@ spec:
         - name: discovery.type
           value: "single-node"
     - name: kaniko
-      image: registry-acdc.tools.msi.audi.com/kaniko:debug-v1.3.0-1
+      image: bitnami/kaniko
       command:
         - cat
       resources:
@@ -60,11 +60,11 @@ spec:
           cpu: 1
           memory: 500Mi
       tty: true
-      volumeMounts:
-        - name: docker-config
-          mountPath: /kaniko/.docker/
+      # volumeMounts:
+      #   - name: docker-config
+      #     mountPath: /kaniko/.docker/
     - name: trivy
-      image: registry-acdc.tools.msi.audi.com/trivy:0.36.1
+      image: aquasec/trivy:latest
       env:
         - name: TRIVY_OFFLINE_SCAN
           value: "true"
@@ -78,23 +78,23 @@ spec:
           cpu: 0.5
           memory: 100Mi
       tty: true
-      volumeMounts:
-        - name: docker-config
-          mountPath: /root/.docker/
-        - name: workspace
-          mountPath: /workspace
-  volumes:
-    - name: docker-config
-      configMap:
-        name: nexus-config
-    - name: kaniko-secret
-      secret:
-        secretName: acdc-registry
-    - name: ivy2-credentials
-      configMap:
-        name: ivy2-credentials
-    - name: workspace
-      emptyDir: {}
-  imagePullSecrets:
-    - name: acdc-registry
-  restartPolicy: Never
+      # volumeMounts:
+      #   - name: docker-config
+      #     mountPath: /root/.docker/
+      #   - name: workspace
+      #     mountPath: /workspace
+  # volumes:
+  #   - name: docker-config
+  #     configMap:
+  #       name: nexus-config
+  #   - name: kaniko-secret
+  #     secret:
+  #       secretName: acdc-registry
+  #   - name: ivy2-credentials
+  #     configMap:
+  #       name: ivy2-credentials
+  #   - name: workspace
+  #     emptyDir: {}
+  # imagePullSecrets:
+  #   - name: acdc-registry
+  # restartPolicy: Never
