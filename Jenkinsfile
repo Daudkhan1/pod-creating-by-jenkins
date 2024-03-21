@@ -25,14 +25,14 @@ pipeline {
 
   stages {
 
-    stage('Notify Stash build starting') {
-      steps {
-        echo "build is starting..."
-        script {
-          notifyBitbucket()
-        }
-      }
-    }
+    // stage('Notify Stash build starting') {
+    //   steps {
+    //     echo "build is starting..."
+    //     script {
+    //       notifyBitbucket()
+    //     }
+    //   }
+    // }
 
     stage('Build & QA') {
       steps {
@@ -47,11 +47,11 @@ pipeline {
 
     stage('Build docker image') {
       when {
-        branch "master"
+        branch "main"
       }
       steps {
         sh 'sbt clean docker:stage'
-        container(name: 'kaniko') {
+        container(name: 'docker') {
           sh """
           executor -c=$WORKSPACE/$dockerStagePath -f=$WORKSPACE/$dockerStagePath/Dockerfile --cleanup --no-push --destination image --tarPath image.tar
           """
@@ -61,7 +61,7 @@ pipeline {
 
     stage("Vulnerability scan") {
       when {
-        branch "master"
+        branch "main"
       }
       steps {
         sshagent(credentials: ['sofa-user-automation']) {
@@ -78,7 +78,7 @@ pipeline {
 
     stage('Publish docker image') {
       when {
-        branch "master"
+        branch "main"
       }
       steps {
         sshagent(credentials: ['sofa-user-automation']) {
